@@ -1,0 +1,7 @@
+node_modules
+
+#output file
+contracts/Test.txt
+
+#trash
+src/myreport1.ts
