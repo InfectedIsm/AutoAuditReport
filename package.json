@@ -7,8 +7,7 @@
   "author": "InfectedIsm",
   "license": "MIT",
   "scripts": {
-    "myreport": "ts-node src/myreport.ts",
-    "myreport1": "ts-node src/myreport1.ts"
+    "index": "ts-node src/index.ts"
   },
   "dependencies": {
     "fs": "^0.0.1-security",
