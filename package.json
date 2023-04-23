@@ -1,5 +1,5 @@
 {
-  "name": "AutoAuditReport",
+  "name": "auto-audit-report",
   "version": "1.0.0",
   "description": "Generate a report skeleton from audit tags",
   "main": "index.js",
