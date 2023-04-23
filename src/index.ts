@@ -1,20 +1,21 @@
 //import files.ts
+import fs from "fs";
 import { pathToFile, fileToLines } from "./utils/files";
-import {Finding, FindingsMap, AuditMap, AuditTagData, 
-  auditKeyToSeverity, extractCodeFromLines, FindingsBySeverity } from "./utils/findings";
+import {Finding, FindingsMap, FindingsBySeverity,
+  AuditMap, auditKeyToSeverity, 
+  extractCodeFromLines } from "./utils/findings";
 
 //for now path is one file, but it will be a folder
 const FileToAuditMap = (path: string, tagKeyword?: string): AuditMap => {
   //generate an array of string with each line
   const file = pathToFile(path);
   const lines = fileToLines(file);
+
   const findingsMap: FindingsMap = {};
   const auditMap: AuditMap = {};
 
-  //actual audit tag processed
-  let currentProcessedAuditTag: AuditTagData | null = null;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+  for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+    const line = lines[lineNumber].trim();
     const usedTagKeyword = (tagKeyword ?? "@audit - ");
     if (line.startsWith("//"+usedTagKeyword)) {
       //2 cases: one line code snippet [LXX] or multi line [LXX-LYY]
@@ -25,30 +26,20 @@ const FileToAuditMap = (path: string, tagKeyword?: string): AuditMap => {
         const level = match[1];
         const auditCode = match[2];
         const description = match[3];
-        const lineStart = match[4];
-        const lineEnd = match[5] ?? match[4];
+        const relativeLineStart = match[4];
+        const relativeLineEnd = match[5] ?? match[4];
         const auditKey = level + auditCode;
-
-        currentProcessedAuditTag = {
-          auditKey,
-          description,
-          lineStart: parseInt(lineStart),
-          lineEnd: parseInt(lineEnd),
-        };
-
-        
+      
         const currentProcessedfinding: Finding = {
-          //probably not needed as it is also in SeverityByFinding
-          // severity: auditKeyToSeverity(auditKey),
-          auditTag: auditKey,
-          description: currentProcessedAuditTag.description,
+          auditKey: auditKey,
+          description: description,
           occurence: 1,
           code: [{
-            line: i,
-            relativeStart: currentProcessedAuditTag.lineStart,
-            relativeEnd: currentProcessedAuditTag.lineEnd,
+            tagLine: lineNumber,
+            relativeStart: parseInt(relativeLineStart),
+            relativeEnd: parseInt(relativeLineEnd),
             //slice doesn't work if lineStart === lineEnd
-            codeSnippet: extractCodeFromLines(lines, currentProcessedAuditTag.lineStart, currentProcessedAuditTag.lineEnd, i),
+            codeSnippet: extractCodeFromLines(lines, lineNumber, parseInt(relativeLineStart), parseInt(relativeLineEnd)),
           }]
         };
 
@@ -64,12 +55,7 @@ const FileToAuditMap = (path: string, tagKeyword?: string): AuditMap => {
       }
     }
   }
-  // console.log(findingsMap);
-
-  // export type FindingsBySeverity = {
-  //   severity: string;
-  //   findings: Finding;
-  // };
+  console.log(findingsMap);
 
   const allAuditKeys = Object.keys(findingsMap);
   for (const auditKey of allAuditKeys) {
@@ -83,14 +69,62 @@ const FileToAuditMap = (path: string, tagKeyword?: string): AuditMap => {
       auditMap[f.severity].push(f);
     }
   }
-  
-  for(const key in auditMap){
-    console.log(auditMap[key]);
 
+  fs.writeFile("auditMap.json", JSON.stringify(auditMap), (err) => {
+    if(err){
+      console.log(err);
+    }else{
+      console.log("File successfully written");
+    }
+  });
+
+  for (const severity in auditMap) {
+    console.log(`## ${severity} issues`);
+    const findingsBySeverity = auditMap[severity];
+  
+    for (const finding of findingsBySeverity) {
+      const { auditKey, description, occurence, code } = finding.findings;
+      console.log(`#### ${auditKey} - ${description} (occurence: ${occurence})`);
+  
+      for (let i = 0; i < code.length; i++) {
+        const { relativeStart, relativeEnd, codeSnippet } = code[i];
+        console.log(`L${relativeStart}-L${relativeEnd}`);
+        console.log('```solidity');
+        console.log(codeSnippet);
+        console.log('```');
+      }
+    }
   }
+  // for(const key in auditMap){
+  //   console.log(auditMap[key]);
+
+  // }
   return auditMap;
 };
 
+const generateReport = (auditMap: AuditMap) => {
+
+  const outputStream = fs.createWriteStream('report.md');
+  // Loop through each severity level and generate report
+  for (const severity in auditMap) {
+    outputStream.write(`## ${severity} issues\n`);
+    const findingsBySeverity = auditMap[severity];
+  
+    for (const finding of findingsBySeverity) {
+      const { auditKey, description, occurence, code } = finding.findings;
+      outputStream.write(`#### ${auditKey} - ${description} (occurence: ${occurence})\n`);
+      outputStream.write(`write your description here\n`);
+  
+      for (let i = 0; i < code.length; i++) {
+        const { relativeStart, relativeEnd, codeSnippet } = code[i];
+        outputStream.write(`L${relativeStart}-L${relativeEnd}\n`);
+        outputStream.write('```solidity\n');
+        outputStream.write(codeSnippet + '\n');
+        outputStream.write('```\n');
+      }
+    }
+  }
+}; 
 // const generateReport = (auditMap: AuditMap): string => {
 // 	let report = '';
 
@@ -122,7 +156,7 @@ const auditMap = FileToAuditMap(
   "C:/Users/Salah/Documents/Coding/AutoAuditReport/contracts/Test.sol"
   // "C:/Users/Salah/Documents/Coding/C4Audit/2023-04-rubicon/contracts/RubiconMarket.sol"
 );
-// const report = generateReport(auditMap);
+generateReport(auditMap);
 // fs.writeFileSync('C:/Users/Salah/Documents/Coding/4naly3er/contracts/example/Test.txt', report);
 
 console.log("Report generated successfully.");
