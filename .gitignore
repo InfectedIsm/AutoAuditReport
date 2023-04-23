@@ -4,4 +4,4 @@ node_modules
 contracts/Test.txt
 
 #trash
-src/myreport1.ts
+contracts/Test.orig.sol
